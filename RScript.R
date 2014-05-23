@@ -3,9 +3,9 @@ library(psych)
 library(TSA)
 library(vars)
 library(fUnitRoots)
-library(rela)
 library(FactoMineR)
 library(astsa)
+library(strucchange)
 
 #PRINCIPAL COMPONENT ANALYSIS
 {
@@ -15,7 +15,7 @@ library(astsa)
           NET[["NASDAQ"]], NET[["PMI"]], NET[["DURGOOD"]], NET[["RTWD_INDX"]], 
           NET[["TED"]], NET[["NIKKEI"]], NET[["SHANGHAI"]], NET[["FTSE100"]], 
           NET[["DAX"]], NET[["CAC40"]], NET[["FTSEMIB"]], NET[["IBEX35"]], 
-          NET[["CONSSENT_4m"]])
+          NET[["CONSSENT_4m"]], NET[["USGDP_REAL"]])
      
      #Conduct Diagnostic Tests
      PCAcor <- cor(pcamat)
@@ -56,6 +56,8 @@ library(astsa)
      globe <- PCA$scores[,2]
 }
 
+## GLOBAL CERAMIC NET-NET SALES
+{
 #UNIT ROOT TESTING
 {
      ts(NET, frequency =12, start=c(2001,4))
@@ -211,6 +213,141 @@ post_fcast <- expostrestrict$fcst$D_cbg
 test_cbg <- data.matrix(D_cbg[144:155],)
 evaldata <- cbind(test_cbg, post_fcast)
 View(evaldata)
+
+}
+
+
+## GLOBAL TANTALUM NET-NET SALES
+{
+     #Unit Root testing
+     {
+          #Global Tantalum Sales
+          plot(NET[["TBG_000"]], type="o")                  
+          acf(NET[["TBG_000"]])
+          pacf(NET[["TBG_000"]])
+          urersTest(NET[["TBG_000"]], type="DF-GLS", model="const", lag.max=4, doplot=T)
+          urkpssTest(NET[["TBG_000"]], type="mu", lags="short", use.lag=4, doplot=T)
+          #Unit Root Present - Take first difference
+     
+          #Tantalum Orders Received
+          plot(NET[["TBG_ORSALE_000"]], type="o")                  
+          acf(NET[["TBG_ORSALE_000"]])
+          pacf(NET[["TBG_ORSALE_000"]])
+          urersTest(NET[["TBG_ORSALE_000"]], type="DF-GLS", model="const", lag.max=2, doplot=T)
+          urkpssTest(NET[["TBG_ORSALE_000"]], type="mu", lags="short", use.lag=2, doplot=T)
+          #Unit Root Present - Take first difference
+     }
+     
+     #Vector Autoregressive Models
+          
+          #Generate Variables
+          {
+          D_tbg <- diff(NET[["TBG_000"]],differences = 1)
+          D_semi <- diff(NET[["SEMISALES"]],differences = 1)
+          D_wtbg <- diff(NET[["W_TBG"]],differences = 1)
+          D_us <- diff(us, differences = 1)
+          D_globe <- diff(globe, differences = 1)
+          VAR_tbg <-data.frame(D_tbg[1:153], 
+                              D_semi[1:153]) 
+          ts(VAR_tbg, frequenc =12, start=c(2001,5))
+          jan <- ifelse(NET[["m"]]==1,1,0)
+          feb <- ifelse(NET[["m"]]==2,1,0)
+          mar <- ifelse(NET[["m"]]==3,1,0)
+          apr <- ifelse(NET[["m"]]==4,1,0)
+          may <- ifelse(NET[["m"]]==5,1,0)
+          jun <- ifelse(NET[["m"]]==6,1,0)
+          jul <- ifelse(NET[["m"]]==7,1,0)
+          aug <- ifelse(NET[["m"]]==8,1,0)
+          sep <- ifelse(NET[["m"]]==9,1,0)
+          oct <- ifelse(NET[["m"]]==10,1,0)
+          nov <- ifelse(NET[["m"]]==11,1,0)
+          dec <- ifelse(NET[["m"]]==12,1,0)
+          evora <- ifelse(NET[["evora"]]==1,1,0)
+          recession <- ifelse(NET[["US_RECESSION"]]==1,1,0)
+          D_tbgorsale <- diff(NET[["TBG_ORSALE"]], differences=1)
+          exog <- data.frame(mar[2:154], apr[2:154])
+          #exog<- data.frame(cbind(exog[2:156,],D_tbgorsale))
+          #exog <- exog[1:153,]
+          }
+     
+     #ExPost Model and Forecast
+     {
+     VARselect(VAR_tbg[1:141,], type="const", lag.max = 15, exogen=exog[1:141,])
+
+     tbg_var <- VAR(VAR_tbg[1:141,], type="const", p=5, exogen=exog[1:141,])
+     summary(tbg_var)
+     res <- resid(tbg_var)
+     hist(res[,1], breaks = 20)
+     plot(tbg_var, names="D_tbg")
+     
+     ##Diagnostic Tests - Serial Correlation
+     serVar1 <- serial.test(tbg_var, lags.pt = 12, type = "PT.asymptotic")
+     serVar1$serial
+     
+     ##Diagnostics Tests - Normality of Residuals
+     normVar1 <- normality.test(tbg_var)
+     normVar1$jb.mul
+     
+     ##Diagnostics Tests - ARCH test for Heteroskedasticity
+     archVar1 <- arch.test(tbg_var, lags.multi = 12)
+     archVar1$arch.mul
+     plot(archVar1, names ="D_tbg")
+     plot(stability(tbg_var), nc=1)
+     
+     ##Diagnostic Tests - Stability Test
+     stability(tbg_var, type= c("Rec-CUSUM"), h=0.15, dynamic = T, rescale = T)
+     plot(stability(tbg_var, type= c("Rec-CUSUM")), nc=2)
+     roots(tbg_var)
+     
+               ##EX-POST FORECASTS
+               
+               ##Separate models based on Training and Testing Data
+               ##Create training set
+               expost <- predict(tbg_var, n.ahead=12, ci=0.95, dumvar=exog[142:153,])
+               plot(expost, names= "D_tbg")
+               print(expost)
+               #Create single matrix for ExPost Data and Forecasts
+               post_fcast <- expost$fcst$D_tbg
+               test_tbg <- data.matrix(D_tbg[142:153],)
+               evaldata <- cbind(test_tbg, post_fcast)
+               View(evaldata)
+     
+     }
+     
+     
+     #ExAnte Model and Forecasts
+     {
+          VARselect(VAR_tbg, type="const", lag.max = 15, exogen=exog)
+          
+          tbg_var <- VAR(VAR_tbg, type="const", p=5, exogen=exog)
+          summary(tbg_var)
+          res <- resid(tbg_var)
+          hist(res[,1], breaks = 20)
+          plot(tbg_var, names="D_tbg")
+          
+          ##Diagnostic Tests - Serial Correlation
+          serVar1 <- serial.test(tbg_var, lags.pt = 12, type = "PT.asymptotic")
+          serVar1$serial
+          
+          ##Diagnostics Tests - Normality of Residuals
+          normVar1 <- normality.test(tbg_var)
+          normVar1$jb.mul
+          
+          ##Diagnostics Tests - ARCH test for Heteroskedasticity
+          archVar1 <- arch.test(tbg_var, lags.multi = 12)
+          archVar1$arch.mul
+          plot(archVar1, names ="D_tbg")
+          plot(stability(tbg_var), nc=1)
+          
+          ##Diagnostic Tests - Stability Test
+          stability(tbg_var, type= c("Rec-CUSUM"), h=0.15, dynamic = T, rescale = T)
+          plot(stability(tbg_var, type= c("Rec-CUSUM")), nc=2)
+          roots(tbg_var)    
+     }
+     
+}
+
+
 
 
 
